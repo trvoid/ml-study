@@ -60,7 +60,28 @@ def plot_scatter_diagram(data_actual, data_measured, title):
     plt.ylabel('measured')
     plt.title(title)
     plt.show()
+
+def plot_histograms_at_each_bin_of_actual_values(frequency_table):
+    min_actual = RANGE_ACTUAL[0]
+    max_actual = RANGE_ACTUAL[1]
+    bin_width = (max_actual - min_actual) / BINS_ACTUAL
     
+    fig = plt.figure(figsize = (16, 8))
+    fig.suptitle('histograms of measured values at each bin of actual values')
+    for i in np.arange(BINS_ACTUAL):
+        edge_left = min_actual + bin_width * i
+        edge_right = min_actual + bin_width * (i + 1)
+        plt.subplot(341 + i)
+        plt.hist(frequency_table[i], bins = BINS_MEASURED, range = RANGE_MEASURED, align = 'mid')
+        plt.xlim(RANGE_MEASURED[0], RANGE_MEASURED[1])
+        plt.ylim(0, 60)
+        plt.grid(True)
+        plt.xlabel('measured')
+        plt.ylabel('frequency')
+        plt.title(f'at bin = {i} ({edge_left} ~ {edge_right})')
+        
+    plt.show()
+
 def get_frequency_table(data_measured):
     min = RANGE_ACTUAL[0]
     max = RANGE_ACTUAL[1]
@@ -157,6 +178,38 @@ def plot_posterior_distribution(hist_table, measured, title):
 
     plt.show()
 
+def plot_all_in_one(data_actual, data_measured, correlation, hist_table, measured):
+    plt.figure(figsize = (16, 8))
+    
+    # scatter diagram
+    plt.subplot(121)
+    plt.scatter(data_actual, data_measured)
+    plt.xlim(0, 400)
+    plt.ylim(0, 100)
+    plt.grid(True)
+    plt.xlabel('actual')
+    plt.ylabel('measured')
+    plt.title(f'scatter diagram (corr = {correlation_a:.2f})')
+    
+    # posterior distribution
+    actual_arr = np.linspace(RANGE_ACTUAL[0], RANGE_ACTUAL[1], 400, endpoint = False)
+    posterior_arr = []
+
+    for actual in actual_arr:
+        posterior = get_posterior(hist_table, actual, measured)
+        posterior_arr.append(posterior)
+
+    plt.subplot(122)
+    plt.plot(actual_arr, posterior_arr)
+    plt.grid(True)
+    plt.xlim(RANGE_ACTUAL[0], RANGE_ACTUAL[1])
+    plt.ylim(0, 1.0)
+    plt.xlabel('actual')
+    plt.ylabel('probability')
+    plt.title(f'posterior distribution with measured = {measured_a}')
+    
+    plt.show()
+    
 def print_usage(script_name):
   print(f'Usage: python {script_name} <dataset_file> <measured_value>')
   
@@ -181,10 +234,15 @@ data_measured_a = dataframe_a['new_device']
 correlation_a, _ = pearsonr(data_measured_a, data_actual)
 print(f'Correlation between DEVICE and GOLD_STANDARD = {correlation_a:.2f}')
 
-plot_scatter_diagram(data_actual, data_measured_a, f'dataset (corr = {correlation_a:.2f})')
-
 frequency_table_a = get_frequency_table(data_measured_a)
 hist_table_a = get_hist_table(frequency_table_a)
 
-title_a = f'posterior distribution with measured = {measured_a}'
-plot_posterior_distribution(hist_table_a, measured_a, title_a)
+if True:
+    plot_all_in_one(data_actual, data_measured_a, correlation_a, hist_table_a, measured_a)
+else:
+    plot_scatter_diagram(data_actual, data_measured_a, f'scatter diagram (corr = {correlation_a:.2f})')
+
+    title_a = f'posterior distribution with measured = {measured_a}'
+    plot_posterior_distribution(hist_table_a, measured_a, title_a)
+    
+plot_histograms_at_each_bin_of_actual_values(frequency_table_a)
