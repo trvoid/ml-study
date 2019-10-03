@@ -6,6 +6,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 
@@ -87,72 +88,104 @@ def get_likelihoods(thetas, sigmas, measured):
         likelihoods[target] = likelihood
         
     return likelihoods
-     
+    
+def get_posteriors(priors, thetas, sigmas, X):
+    # get likelihoods
+    likelihoods = get_likelihoods(thetas, sigmas, X)
+    
+    # get marginal likelihood
+    marginal_likelihood = 0.0
+    for target in priors.keys():
+        prior = priors[target]
+        likelihood = likelihoods[target]
+        marginal_likelihood += likelihood * prior
+    
+    # get posteriors
+    posteriors = {}
+    for target in priors.keys():
+        prior = priors[target]
+        likelihood = likelihoods[target]
+        posterior = likelihood * prior / marginal_likelihood
+        posteriors[target] = posterior
+    
+    return posteriors
+    
+################################################################################
+# Classes                                                                      #
+################################################################################
+
+class GaussianNB:
+    def fit(self, X, y):
+        # separate by targets
+        self.separated = separate_by_targets(X, y)
+        
+        # get priors
+        self.priors = get_priors(self.separated)
+        
+        # get norm parameters
+        self.thetas, self.sigmas = get_norm_params(self.separated)
+        
+    def predict(self, X):
+        predicted = []
+        
+        for row in np.arange(X.shape[0]):
+            posteriors = get_posteriors(self.priors, self.thetas, self.sigmas, X[row,:])
+
+            # find a maximum posterior
+            max = 0.0
+            map = None
+            for target in posteriors.keys():
+                posterior = posteriors[target]
+                if posterior > max:
+                    max = posterior
+                    map = target
+            
+            predicted.append(map)
+            
+        return predicted
+        
+    def score(self, X, y):
+        return sum(self.predict(X) == y) / len(y)
+        
 ################################################################################
 # Main                                                                         #
 ################################################################################
     
 def main():
     np.set_printoptions(precision=6)
+    np.random.seed(7)
     
     ds_iris = load_iris()
-    
+
     print('===== data description')
     df_data = pd.DataFrame(ds_iris.data, columns=ds_iris.feature_names)
     print(df_data.describe())
     
-    separated = separate_by_targets(ds_iris.data, ds_iris.target)
-    priors = get_priors(separated)
-    thetas, sigmas = get_norm_params(separated)
+    # Split into train and test datasets
+    X, y = ds_iris.data, ds_iris.target
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     
-    print('===== priors')
-    for target in priors.keys():
-        print(f'{target}: {priors[target]:.10f}')
+    # Fit with Gaussian Naive Bayes
+    nb = GaussianNB()
+    nb.fit(X_train, y_train)
     
     # plot feature histograms per target
     if False:
         feature_names = ds_iris.feature_names
-        for target in separated.keys():
+        for target in nb.separated.keys():
             target_name = ds_iris.target_names[target]
-            plot_feature_histograms_for_a_target(separated, target, feature_names, target_name)
+            plot_feature_histograms_for_a_target(nb.separated, target, feature_names, target_name)
     
-    # get likelihoods
-    measured = [5.1, 3.3, 1.4, 0.2]
-    likelihoods = get_likelihoods(thetas, sigmas, measured)
-    print('===== likelihoods')
-    for target in likelihoods.keys():
-        print(f'{target}: {likelihoods[target]:.10f}')
+    print(f'===== score')
+    score = nb.score(X_test, y_test)
+    print(f'{score:.4f}')
+            
+    measured = np.array([[5.1, 3.3, 1.4, 0.2]])
+    y = nb.predict(measured)
+    print(f'===== predicted')
+    print(y)
     
-    # get marginal likelihood
-    marginal_likelihood = 0.0
-    for target in separated.keys():
-        prior = priors[target]
-        likelihood = likelihoods[target]
-        marginal_likelihood += likelihood * prior
-    print('===== marginal likelihood')
-    print(f'{marginal_likelihood:.10f}')
     
-    # get posteriors
-    print('===== posteriors')
-    posteriors = {}
-    for target in separated.keys():
-        prior = priors[target]
-        likelihood = likelihoods[target]
-        posterior = likelihood * prior / marginal_likelihood
-        posteriors[target] = posterior
-        print(f'{target}: {posterior:.10f}')
 
-    # find a maximum posterior
-    max = 0.0
-    map = None
-    for target in posteriors.keys():
-        posterior = posteriors[target]
-        if posterior > max:
-            max = posterior
-            map = target
-    
-    print(f'===== MAP')
-    print(f'MAP: {map} ({ds_iris.target_names[map]})')
-    
 if __name__ == '__main__':
     main()
