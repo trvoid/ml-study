@@ -33,16 +33,20 @@ def separate_by_targets(X, y):
     return separated
     
 def get_norm_params(separated):
-    thetas = defaultdict(lambda: [])
-    sigmas = defaultdict(lambda: [])
+    targets = separated.keys()
+    target_count = len(targets)
+    feature_count = separated[0].shape[1]
+
+    thetas = np.zeros((target_count, feature_count))
+    sigmas = np.zeros((target_count, feature_count))
     
-    for target in separated.keys():
+    for target in targets:
         ds_measured = separated[target]
-        for col in np.arange(ds_measured.shape[1]):
+        for col in np.arange(feature_count):
             theta = np.mean(ds_measured[:, col])
             sigma = np.std(ds_measured[:, col])
-            thetas[target].append(theta)
-            sigmas[target].append(sigma)
+            thetas[target, col] = theta
+            sigmas[target, col] = sigma
         
     return thetas, sigmas
     
@@ -62,27 +66,28 @@ def plot_feature_histograms_for_a_target(separated, target, feature_names, targe
     plt.show()
     
 def get_priors(separated):
-    priors = {}
+    targets = separated.keys()
+
+    priors = np.zeros(len(targets))
     
     total_count = 0
-    for target in separated.keys():
+    for target in targets:
         count = separated[target].shape[0]
         total_count += count
         priors[target] = count
     
-    for target in priors.keys():
-        priors[target] = priors[target] / total_count
+    priors /= total_count
     
     return priors
 
 def get_likelihoods(thetas, sigmas, measured):
     likelihoods = {}
     
-    for target in thetas.keys():
+    for target in np.arange(len(thetas)):
         likelihood = 1.0
         for col in np.arange(len(measured)):
-            theta = thetas[target][col]
-            sigma = sigmas[target][col]
+            theta = thetas[target, col]
+            sigma = sigmas[target, col]
             l = norm.pdf(measured[col], theta, sigma)
             likelihood *= l
         likelihoods[target] = likelihood
@@ -95,14 +100,14 @@ def get_posteriors(priors, thetas, sigmas, X):
     
     # get marginal likelihood
     marginal_likelihood = 0.0
-    for target in priors.keys():
+    for target in np.arange(len(priors)):
         prior = priors[target]
         likelihood = likelihoods[target]
         marginal_likelihood += likelihood * prior
     
     # get posteriors
     posteriors = {}
-    for target in priors.keys():
+    for target in np.arange(len(priors)):
         prior = priors[target]
         likelihood = likelihoods[target]
         posterior = likelihood * prior / marginal_likelihood
@@ -110,6 +115,17 @@ def get_posteriors(priors, thetas, sigmas, X):
     
     return posteriors
     
+def explore_data(ds_iris):
+    print('===== data description')
+    df_data = pd.DataFrame(ds_iris.data, columns=ds_iris.feature_names)
+    print(df_data.describe())
+
+    separated = separate_by_targets(ds_iris.data, ds_iris.target)
+    for target in separated.keys():
+        feature_names = ds_iris.feature_names
+        target_name = ds_iris.target_names[target]
+        plot_feature_histograms_for_a_target(separated, target, feature_names, target_name)
+
 ################################################################################
 # Classes                                                                      #
 ################################################################################
@@ -117,13 +133,13 @@ def get_posteriors(priors, thetas, sigmas, X):
 class GaussianNB:
     def fit(self, X, y):
         # separate by targets
-        self.separated = separate_by_targets(X, y)
+        separated = separate_by_targets(X, y)
         
         # get priors
-        self.priors = get_priors(self.separated)
+        self.priors = get_priors(separated)
         
         # get norm parameters
-        self.thetas, self.sigmas = get_norm_params(self.separated)
+        self.thetas, self.sigmas = get_norm_params(separated)
         
     def predict(self, X):
         predicted = []
@@ -157,9 +173,8 @@ def main():
     
     ds_iris = load_iris()
 
-    print('===== data description')
-    df_data = pd.DataFrame(ds_iris.data, columns=ds_iris.feature_names)
-    print(df_data.describe())
+    # Describe data and plot feature histograms per target
+    # explore_data(ds_iris)
     
     # Split into train and test datasets
     X, y = ds_iris.data, ds_iris.target
@@ -168,13 +183,6 @@ def main():
     # Fit with Gaussian Naive Bayes
     nb = GaussianNB()
     nb.fit(X_train, y_train)
-    
-    # plot feature histograms per target
-    if False:
-        feature_names = ds_iris.feature_names
-        for target in nb.separated.keys():
-            target_name = ds_iris.target_names[target]
-            plot_feature_histograms_for_a_target(nb.separated, target, feature_names, target_name)
     
     print(f'===== score')
     score = nb.score(X_test, y_test)
