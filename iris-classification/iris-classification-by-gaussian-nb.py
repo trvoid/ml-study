@@ -2,6 +2,7 @@
 # Iris classification by Gaussian Naive Bayes method from scratch in Python    #
 ################################################################################
 
+import sys
 from collections import defaultdict
 import numpy as np
 import pandas as pd
@@ -9,10 +10,6 @@ from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-
-################################################################################
-# Constants                                                                    #
-################################################################################
 
 ################################################################################
 # Functions                                                                    #
@@ -81,47 +78,35 @@ def get_priors(separated):
     return priors
 
 def get_likelihoods(thetas, sigmas, measured):
-    likelihoods = {}
+    target_count = thetas.shape[0]
+    instance_count = measured.shape[0]
+
+    likelihoods = np.zeros((instance_count, target_count))
     
-    for target in np.arange(len(thetas)):
-        likelihood = 1.0
-        for col in np.arange(len(measured)):
-            theta = thetas[target, col]
-            sigma = sigmas[target, col]
-            l = norm.pdf(measured[col], theta, sigma)
-            likelihood *= l
-        likelihoods[target] = likelihood
+    for target in np.arange(target_count):
+        l = norm.pdf(measured, thetas[target, :], sigmas[target, :])
+        likelihoods[:, target] = np.prod(l, axis=1)
         
     return likelihoods
     
 def get_posteriors(priors, thetas, sigmas, X):
-    # get likelihoods
     likelihoods = get_likelihoods(thetas, sigmas, X)
-    
-    # get marginal likelihood
-    marginal_likelihood = 0.0
-    for target in np.arange(len(priors)):
-        prior = priors[target]
-        likelihood = likelihoods[target]
-        marginal_likelihood += likelihood * prior
-    
-    # get posteriors
-    posteriors = {}
-    for target in np.arange(len(priors)):
-        prior = priors[target]
-        likelihood = likelihoods[target]
-        posterior = likelihood * prior / marginal_likelihood
-        posteriors[target] = posterior
-    
+    marginal_likelihoods = np.sum(likelihoods * priors, axis=1)
+    likelihood_ratios = likelihoods / marginal_likelihoods.reshape(len(marginal_likelihoods), -1)
+    posteriors = likelihood_ratios * priors
     return posteriors
     
 def explore_data(ds_iris):
+    print('===== feature names')
+    print(ds_iris.feature_names)
+    
     print('===== data description')
     df_data = pd.DataFrame(ds_iris.data, columns=ds_iris.feature_names)
     print(df_data.describe())
 
+    print('===== feature histograms per target')
     separated = separate_by_targets(ds_iris.data, ds_iris.target)
-    for target in separated.keys():
+    for target in np.arange(len(separated.keys())):
         feature_names = ds_iris.feature_names
         target_name = ds_iris.target_names[target]
         plot_feature_histograms_for_a_target(separated, target, feature_names, target_name)
@@ -142,22 +127,8 @@ class GaussianNB:
         self.thetas, self.sigmas = get_norm_params(separated)
         
     def predict(self, X):
-        predicted = []
-        
-        for row in np.arange(X.shape[0]):
-            posteriors = get_posteriors(self.priors, self.thetas, self.sigmas, X[row,:])
-
-            # find a maximum posterior
-            max = 0.0
-            map = None
-            for target in posteriors.keys():
-                posterior = posteriors[target]
-                if posterior > max:
-                    max = posterior
-                    map = target
-            
-            predicted.append(map)
-            
+        posteriors = get_posteriors(self.priors, self.thetas, self.sigmas, X)
+        predicted = np.argmax(posteriors, axis=1)
         return predicted
         
     def score(self, X, y):
@@ -167,33 +138,43 @@ class GaussianNB:
 # Main                                                                         #
 ################################################################################
     
-def main():
+def main(explore=False):
     np.set_printoptions(precision=6)
     np.random.seed(7)
     
+    # 1. Load data
     ds_iris = load_iris()
 
+    print('===== target names')
+    print(ds_iris.target_names)
+
     # Describe data and plot feature histograms per target
-    # explore_data(ds_iris)
+    if explore:
+        explore_data(ds_iris)
     
-    # Split into train and test datasets
+    # 2. Split into train and test datasets
     X, y = ds_iris.data, ds_iris.target
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     
-    # Fit with Gaussian Naive Bayes
+    # 3. Fit with the train dataset by Gaussian Naive Bayes method
     nb = GaussianNB()
     nb.fit(X_train, y_train)
     
+    # 4. Evaluate with the test dataset
     print(f'===== score')
     score = nb.score(X_test, y_test)
     print(f'{score:.4f}')
-            
-    measured = np.array([[5.1, 3.3, 1.4, 0.2]])
-    y = nb.predict(measured)
-    print(f'===== predicted')
-    print(y)
-    
-    
 
+    # 5. Predict with the new input data
+    measured = np.array([[5.1, 3.3, 1.4, 0.2], [6.1, 3.3, 5.1, 2.4]])
+    targets = nb.predict(measured)
+    print(f'===== predicted')
+    for i in np.arange(measured.shape[0]):
+        print(f'{measured[i,:]} => {ds_iris.target_names[targets[i]]}')
+    
 if __name__ == '__main__':
-    main()
+    explore = False
+    if len(sys.argv) == 2 and sys.argv[1] == 'e':
+        explore = True
+
+    main(explore)
