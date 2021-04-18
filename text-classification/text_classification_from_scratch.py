@@ -184,7 +184,7 @@ if __name__ == '__main__':
                 print(f'loss: {loss:.4f}, accuracy: {acc:.4f}')
 
         print('==== Test ====')
-        loss, acc = rnn.train(test_data, True)
+        loss, acc = rnn.train(test_data, False)
         print(f'loss: {loss:.4f}, accuracy: {acc:.4f}')
 
         print('==== Predict ====')
