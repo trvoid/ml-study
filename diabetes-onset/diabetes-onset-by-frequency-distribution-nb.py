@@ -1,5 +1,6 @@
 ################################################################################
-# Diabetes onset by Multi-Layer Perceptron method from scratch in Python       #
+# Predict the onset of diabetes by frequency distribution naive bayes method   #
+# from scratch in Python                                                       #
 ################################################################################
 
 import os, sys, traceback
@@ -41,7 +42,7 @@ def get_bin_index(bin_edges, value):
 # Classes                                                                      #
 ################################################################################
 
-class NBClassifier:
+class FrequencyNB:
     def __init__(self, bin_edges_list):
         self.bin_edges_list = bin_edges_list
 
@@ -101,6 +102,8 @@ class NBClassifier:
 # Variables                                                                    #
 ################################################################################
 
+bins_count = 5
+
 sample_data = np.array([[6, 148, 72, 35, 100, 50, 1, 40], [1, 148, 72, 35, 100, 50, 1, 40]])
 
 ################################################################################
@@ -123,14 +126,14 @@ def main(explore=False):
     
     bin_edges_list = []
     for col in np.arange(X.shape[1]):
-        _, bin_edges = np.histogram(X[:, col], bins=10)
+        _, bin_edges = np.histogram(X[:, col], bins=bins_count)
         #print(f'col {col}: {bin_edges}')
         bin_edges_list.append(bin_edges)
 
     # 2. Split into train and test datasets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-    nb_classifier = NBClassifier(bin_edges_list)
+    nb_classifier = FrequencyNB(bin_edges_list)
     nb_classifier.fit(X_train, y_train)
 
     score = nb_classifier.score(X_test, y_test)
