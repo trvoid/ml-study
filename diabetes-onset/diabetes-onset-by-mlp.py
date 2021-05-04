@@ -78,7 +78,7 @@ class MLP:
 
         return y, h
 
-    def backword(self, d_y, learn_rate=2e-2):
+    def backward(self, d_y, learn_rate=2e-2):
         d_Why = d_y @ self.last_h.T
         d_by = d_y
 
@@ -116,7 +116,7 @@ class MLP:
                 d_y = p
                 d_y[target] -= 1
                 
-                self.backword(d_y)
+                self.backward(d_y)
 
         loss = loss[0] / row_count
         acc = num_correct / row_count
@@ -136,7 +136,7 @@ class MLP:
 input_size = 8
 hidden_size = 16
 output_size = 2
-epochs = 10
+epochs = 500
 
 sample_data = np.array([[6, 148, 72, 35, 100, 50, 1, 40], [1, 148, 72, 35, 100, 50, 1, 40]])
 

@@ -83,7 +83,7 @@ class MLP:
 
         return y, h
 
-    def backword(self, d_y, learn_rate=2e-2):
+    def backward(self, d_y, learn_rate=2e-2):
         d_Why = d_y @ self.last_h.T
         d_by = d_y
 
@@ -121,7 +121,7 @@ class MLP:
                 d_y = p
                 d_y[target] -= 1
                 
-                self.backword(d_y)
+                self.backward(d_y)
 
         loss = loss[0] / row_count
         acc = num_correct / row_count
