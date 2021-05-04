@@ -62,10 +62,10 @@ def explore_data(ds):
 
 class MLP:
     def __init__(self, input_size, output_size, hidden_size=64):
-        self.Wxh = np.random.randn(hidden_size, input_size) / 1000
+        self.Wxh = np.random.randn(hidden_size, input_size) / 1
         self.bh = np.zeros((hidden_size, 1))
 
-        self.Why = np.random.randn(output_size, hidden_size) / 1000
+        self.Why = np.random.randn(output_size, hidden_size) / 1
         self.by = np.zeros((output_size, 1))
 
     def forward(self, x):
@@ -136,7 +136,7 @@ class MLP:
 input_size = 8
 hidden_size = 16
 output_size = 2
-epochs = 500
+epochs = 30
 
 sample_data = np.array([[6, 148, 72, 35, 100, 50, 1, 40], [1, 148, 72, 35, 100, 50, 1, 40]])
 
@@ -158,7 +158,7 @@ def main(explore=False):
     # 2. Split into train and test datasets
     X = ds_diabetes.values[:,:-1]
     y = [int(v) for v in ds_diabetes.values[:,-1]]
-    print(y)
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     
     # 3. Fit with the train dataset
