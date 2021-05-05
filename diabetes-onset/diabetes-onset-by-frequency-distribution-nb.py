@@ -8,28 +8,62 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 
 ################################################################################
 # Functions                                                                    #
 ################################################################################
 
-def separate_by_targets(X, y):
-    separated = defaultdict(lambda: [])
+def load_data():
+    return pd.read_csv('datasets_228_482_diabetes.csv')
+
+def separate_by_target(X, y):
+    separated_dict = defaultdict(lambda: [])
     
     row_count = X.shape[0]
     for row in np.arange(row_count):
         measured = X[row, :]
         target = y[row]
-        separated[target].append(measured)
+        separated_dict[target].append(measured)
     
-    for target in separated.keys():
-        separated[target] = np.array(separated[target])
+    for target in separated_dict.keys():
+        separated_dict[target] = np.array(separated_dict[target])
         
-    return separated
+    return separated_dict
 
-def explore_data(ds):
+def plot_feature_histograms_for_a_target(ds_measured, feature_names, target_name, bin_count):
+    fig = plt.figure(figsize = (16,4))
+    fig.suptitle(f'feature histograms for a target: {target_name}')
+    for col in np.arange(len(feature_names)):
+        plt.subplot(241 + col)
+        plt.hist(ds_measured[:, col], bins=bin_count)
+        plt.grid(True)
+        plt.xlabel('measured')
+        plt.ylabel('frequency')
+        plt.title(feature_names[col])
+    
+    plt.show()
+
+def explore_data(ds, bin_count):
     print(ds.head())
     print(ds.describe())
+
+    print('===== feature histograms per target')
+    separated_dict = separate_by_target(ds.values[:,:-1], ds.values[:,-1])
+    for target in np.arange(len(separated_dict.keys())):
+        feature_names = ds.columns[:-1]
+        target_name = f'{ds.columns[-1]}({target})'
+        plot_feature_histograms_for_a_target(separated_dict[target], feature_names, target_name, bin_count)
+
+def make_bin_edges(ds, bin_count):
+    bin_edges_dict = {}
+    
+    for col in np.arange(ds.values.shape[1]):
+        _, bin_edges = np.histogram(ds.values[:, col], bins=bin_count)
+        #print(f'col {col}: {bin_edges}')
+        bin_edges_dict[col] = bin_edges
+
+    return bin_edges_dict
 
 def get_bin_index(bin_edges, value):
     for i in np.arange(len(bin_edges) - 1):
@@ -49,7 +83,7 @@ class FrequencyNB:
     def fit(self, X, y):
         self.priors = {}
 
-        separated = separate_by_targets(X, y)
+        separated = separate_by_target(X, y)
 
         for target in separated.keys():
             self.priors[target] = separated[target].shape[0] / X.shape[0]
@@ -102,7 +136,8 @@ class FrequencyNB:
 # Variables                                                                    #
 ################################################################################
 
-bins_count = 5
+explore_bin_count = 10
+fit_bin_count = 5
 
 sample_data = np.array([[6, 148, 72, 35, 100, 50, 1, 40], [1, 148, 72, 35, 100, 50, 1, 40]])
 
@@ -115,30 +150,30 @@ def main(explore=False):
     np.random.seed(7)
     
     # 1. Load data
-    ds_diabetes = pd.read_csv('datasets_228_482_diabetes.csv')
-    
-    # Describe data and plot feature histograms per target
-    if explore:
-        explore_data(ds_diabetes)
-    
-    X = ds_diabetes.values[:,:-1]
-    y = [int(v) for v in ds_diabetes.values[:,-1]]
-    
-    bin_edges_list = []
-    for col in np.arange(X.shape[1]):
-        _, bin_edges = np.histogram(X[:, col], bins=bins_count)
-        #print(f'col {col}: {bin_edges}')
-        bin_edges_list.append(bin_edges)
+    ds = load_data()
 
-    # 2. Split into train and test datasets
+    # 2. Explore data
+    if explore:
+        explore_data(ds, explore_bin_count)
+
+    # 3. Make bin edges
+    bin_edges_dict = make_bin_edges(ds, fit_bin_count)
+
+    # 4. Split into train and test datasets
+    X = ds.values[:,:-1]
+    y = [int(v) for v in ds.values[:,-1]]
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-    nb_classifier = FrequencyNB(bin_edges_list)
+    # 5. Fit the classifier
+    nb_classifier = FrequencyNB(bin_edges_dict)
     nb_classifier.fit(X_train, y_train)
 
+    # 6. Score the performance
     score = nb_classifier.score(X_test, y_test)
     print(f'score: {score:.4f}')
 
+    # 7. Predict on sample data
     y_pred = nb_classifier.predict(sample_data)
     print(y_pred)
 
