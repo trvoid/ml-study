@@ -55,11 +55,11 @@ def explore_data(ds, bin_count):
         target_name = f'{ds.columns[-1]}({target})'
         plot_feature_histograms_for_a_target(separated_dict[target], feature_names, target_name, bin_count)
 
-def make_bin_edges(ds, bin_count):
+def make_bin_edges(data, bin_count):
     bin_edges_dict = {}
     
-    for col in np.arange(ds.values.shape[1]):
-        _, bin_edges = np.histogram(ds.values[:, col], bins=bin_count)
+    for col in np.arange(data.shape[1]):
+        _, bin_edges = np.histogram(data[:, col], bins=bin_count)
         #print(f'col {col}: {bin_edges}')
         bin_edges_dict[col] = bin_edges
 
@@ -152,28 +152,28 @@ def main(explore=False):
     # 1. Load data
     ds = load_data()
 
-    # 2. Explore data
+    # Explore data
     if explore:
         explore_data(ds, explore_bin_count)
 
-    # 3. Make bin edges
-    bin_edges_dict = make_bin_edges(ds, fit_bin_count)
-
-    # 4. Split into train and test datasets
     X = ds.values[:,:-1]
     y = [int(v) for v in ds.values[:,-1]]
+    
+    # 2. Make bin edges
+    bin_edges_dict = make_bin_edges(X, fit_bin_count)
 
+    # 3. Split into train and test datasets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-    # 5. Fit the classifier
+    # 4. Fit the classifier
     nb_classifier = FrequencyNB(bin_edges_dict)
     nb_classifier.fit(X_train, y_train)
 
-    # 6. Score the performance
+    # 5. Score the performance
     score = nb_classifier.score(X_test, y_test)
     print(f'score: {score:.4f}')
 
-    # 7. Predict on sample data
+    # 6. Predict on sample data
     y_pred = nb_classifier.predict(sample_data)
     print(y_pred)
 

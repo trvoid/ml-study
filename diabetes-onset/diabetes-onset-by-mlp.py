@@ -6,6 +6,7 @@ import os, sys, traceback
 from collections import defaultdict
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
@@ -134,7 +135,7 @@ class MLP:
 ################################################################################
 
 input_size = 8
-hidden_size = 16
+hidden_size = 4
 output_size = 2
 epochs = 30
 
@@ -149,17 +150,24 @@ def main(explore=False):
     np.random.seed(7)
     
     # 1. Load data
-    ds_diabetes = pd.read_csv('datasets_228_482_diabetes.csv')
+    ds = pd.read_csv('datasets_228_482_diabetes.csv')
     
     # Describe data and plot feature histograms per target
     if explore:
-        explore_data(ds_diabetes)
-    
+        explore_data(ds)
+
+    zero_features = ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI']
+    mean_zero_features = ds[zero_features].mean()
+    ds[zero_features] = ds[zero_features].replace(0, mean_zero_features)
+
+    X = ds.values[:,:-1]
+    y = [int(v) for v in ds.values[:,-1]]
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
     # 2. Split into train and test datasets
-    X = ds_diabetes.values[:,:-1]
-    y = [int(v) for v in ds_diabetes.values[:,-1]]
-    
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2)
     
     # 3. Fit with the train dataset
     mlp = MLP(input_size, output_size, hidden_size)
