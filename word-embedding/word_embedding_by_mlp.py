@@ -19,7 +19,9 @@ def mapping(tokens):
     word_to_id = {}
     id_to_word = {}
     
-    for i, token in enumerate(set(tokens)):
+    token_set = list(dict.fromkeys(tokens))
+    
+    for i, token in enumerate(token_set):
         word_to_id[token] = i
         id_to_word[i] = token
     
