@@ -61,11 +61,9 @@ def generate_training_data(tokens, word_to_id, window):
 
 class MLP:
     def __init__(self, input_size, output_size, hidden_size=64):
-        #self.Wxh = np.random.randn(hidden_size, input_size) / 1000
         self.Wxh = np.random.randn(hidden_size, input_size)
         self.bh = np.zeros((hidden_size, 1))
 
-        #self.Why = np.random.randn(output_size, hidden_size) / 1000
         self.Why = np.random.randn(output_size, hidden_size)
         self.by = np.zeros((output_size, 1))
 
@@ -98,7 +96,7 @@ class MLP:
         #self.bh -= learn_rate * d_bh
         #self.by -= learn_rate * d_by
 
-    def train(self, X_train, y_train, backprop=True):
+    def train(self, X_train, y_train, backprop=True, learn_rate=2e-2):
         loss = 0
         num_correct = 0
         
@@ -117,7 +115,7 @@ class MLP:
                 d_y = p
                 d_y[target] -= 1
                 
-                self.backward(d_y, 0.05)
+                self.backward(d_y, learn_rate)
 
         loss = loss[0] / row_count
         acc = num_correct / row_count
@@ -135,6 +133,8 @@ class MLP:
 ################################################################################
 
 epochs = 50
+
+sample_data = ['static', 'string']
 
 # Excerpt from https://dart.dev/guides/language/type-system
 text = 'Soundness is about ensuring your program can’t get into certain invalid states. \
@@ -154,16 +154,19 @@ def main(plot=False):
     np.set_printoptions(precision=6)
     np.random.seed(42)
     
-    # 1. Prepare data
+    # 1. Load data
     tokens = tokenize(text)
     word_to_id, id_to_word = mapping(tokens)
     print(id_to_word)
     
-    # 2. Generate training data
     window = 2
-    X_train, y_train = generate_training_data(tokens, word_to_id, window)
-    X_test = X_train
-    y_test = y_train
+    X, y = generate_training_data(tokens, word_to_id, window)
+
+    # 2. Split into train and test datasets
+    X_train = X
+    y_train = y
+    X_test = X
+    y_test = y
 
     print(f'X_train.shape: {X_train.shape}')
     print(f'y_train.shape: {y_train.shape}')
@@ -174,14 +177,15 @@ def main(plot=False):
     input_size = len(word_to_id)
     hidden_size = 10
     output_size = len(word_to_id)
+    learn_rate = 0.05
 
     mlp = MLP(input_size, output_size, hidden_size)
 
     print('==== Train ====')
     history = []
     for epoch in range(epochs):
-        loss, acc = mlp.train(X_train, y_train, True)
-        history.append(loss * X_train.shape[0])
+        loss, acc = mlp.train(X_train, y_train, True, learn_rate)
+        history.append(loss)
         if epoch % 1 == 0:
             print(f'Epoch: {epoch + 1:4d}, loss: {loss:.4f}, accuracy: {acc:.4f}')
 
@@ -197,15 +201,16 @@ def main(plot=False):
 
     # 5. Predict with the new input data
     print(f'===== Predict')
-    input_word = 'static'
-    measured = np.array(one_hot_encode(word_to_id[input_word], len(word_to_id)))
-    target = mlp.predict(measured.reshape(-1, 1))
-    print(f'{input_word} => {id_to_word[target]}')
+    for row in range(len(sample_data)):
+        input_word = sample_data[row]
+        measured = np.array(one_hot_encode(word_to_id[input_word], len(word_to_id)))
+        target = mlp.predict(measured.reshape(-1, 1))
+        print(f'{input_word} => {id_to_word[target]}')
 
 if __name__ == '__main__':
     try:
         plot = False
-        if len(sys.argv) == 2 and sys.argv[1] == 'p':
+        if len(sys.argv) == 2 and 'p' in sys.argv[1]:
             plot = True
 
         main(plot)

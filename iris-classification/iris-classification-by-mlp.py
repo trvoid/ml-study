@@ -102,10 +102,10 @@ class MLP:
         self.bh -= learn_rate * d_bh
         self.by -= learn_rate * d_by
 
-    def train(self, X_train, y_train, backprop=True):
+    def train(self, X_train, y_train, backprop=True, learn_rate=2e-2):
         loss = 0
         num_correct = 0
-
+        
         row_count = X_train.shape[0]
         for row in np.arange(row_count):
             measured = X_train[row, :].reshape(-1, 1)
@@ -121,7 +121,7 @@ class MLP:
                 d_y = p
                 d_y[target] -= 1
                 
-                self.backward(d_y)
+                self.backward(d_y, learn_rate)
 
         loss = loss[0] / row_count
         acc = num_correct / row_count
@@ -138,9 +138,6 @@ class MLP:
 # Variables                                                                    #
 ################################################################################
 
-input_size = 4
-hidden_size = 8
-output_size = 3
 epochs = 50
 
 sample_data = np.array([[5.1, 3.3, 1.4, 0.2], [6.1, 3.3, 5.1, 2.4]])
@@ -149,7 +146,7 @@ sample_data = np.array([[5.1, 3.3, 1.4, 0.2], [6.1, 3.3, 5.1, 2.4]])
 # Main                                                                         #
 ################################################################################
 
-def main(explore=False):
+def main(explore=False, plot=False):
     np.set_printoptions(precision=6)
     np.random.seed(7)
     
@@ -168,15 +165,25 @@ def main(explore=False):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     
     # 3. Fit with the train dataset
+    input_size = 4
+    hidden_size = 8
+    output_size = 3
+
     mlp = MLP(input_size, output_size, hidden_size)
 
     print('==== Train ====')
+    history = []
     for epoch in range(epochs):
         loss, acc = mlp.train(X_train, y_train, True)
+        history.append(loss)
         if epoch % 1 == 0:
-            print(f'** Epoch: {epoch + 1} **')
-            print(f'loss: {loss:.4f}, accuracy: {acc:.4f}')
+            print(f'Epoch: {epoch + 1:4d}, loss: {loss:.4f}, accuracy: {acc:.4f}')
 
+    if plot:
+        plt.style.use("seaborn")
+        plt.plot(range(len(history)), history, color="skyblue")
+        plt.show()
+    
     # 4. Evaluate with the test dataset
     print('==== Test ====')
     loss, acc = mlp.train(X_test, y_test, False)
@@ -192,7 +199,7 @@ def main(explore=False):
 if __name__ == '__main__':
     try:
         explore = False
-        if len(sys.argv) == 2 and sys.argv[1] == 'e':
+        if len(sys.argv) == 2 and 'e' in sys.argv[1]:
             explore = True
 
         main(explore)
