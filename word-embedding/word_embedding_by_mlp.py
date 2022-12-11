@@ -5,6 +5,7 @@
 import os, sys, traceback
 import numpy as np
 import re
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 ################################################################################
@@ -139,7 +140,7 @@ epochs = 50
 sample_data = ['static', 'string']
 
 # Excerpt from https://dart.dev/guides/language/type-system
-text = 'Soundness is about ensuring your program can’t get into certain invalid states. \
+text_data = 'Soundness is about ensuring your program can’t get into certain invalid states. \
     A sound type system means you can never get into a state where an expression evaluates \
     to a value that doesn’t match the expression’s static type. For example, if an expression’s \
     static type is String, at runtime you are guaranteed to only get a string when you evaluate it. \
@@ -152,11 +153,17 @@ text = 'Soundness is about ensuring your program can’t get into certain invali
 # Main                                                                         #
 ################################################################################
 
-def main(plot=False):
+def main(filepath, plot=False):
     np.set_printoptions(precision=6)
     np.random.seed(42)
     
     # 1. Load data
+    if filepath is not None:
+        with open(filepath, mode='r', encoding='utf-8') as f:
+            text = f.read()
+    else:
+        text = text_data
+
     tokens = tokenize(text)
     word_to_id, id_to_word = mapping(tokens)
     print(id_to_word)
@@ -165,10 +172,8 @@ def main(plot=False):
     X, y = generate_training_data(tokens, word_to_id, window)
 
     # 2. Split into train and test datasets
-    X_train = X
-    y_train = y
-    X_test = X
-    y_test = y
+    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    X_train, y_train, X_test, y_test = X, y, X, y
 
     print(f'X_train.shape: {X_train.shape}')
     print(f'y_train.shape: {y_train.shape}')
@@ -211,10 +216,14 @@ def main(plot=False):
 
 if __name__ == '__main__':
     try:
+        filepath = None
+        if len(sys.argv) >= 3 and 'f' in sys.argv[1]:
+            filepath = sys.argv[2]
+
         plot = False
-        if len(sys.argv) == 2 and 'p' in sys.argv[1]:
+        if len(sys.argv) >= 2 and 'p' in sys.argv[1]:
             plot = True
 
-        main(plot)
+        main(filepath, plot)
     except:
         traceback.print_exc(file=sys.stdout)
