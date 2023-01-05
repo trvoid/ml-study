@@ -137,7 +137,7 @@ class MLP:
 
 epochs = 50
 
-sample_data = ['static', 'string']
+sample_words = ['static', 'string']
 
 # Excerpt from https://dart.dev/guides/language/type-system
 text_data = 'Soundness is about ensuring your program can’t get into certain invalid states. \
@@ -153,18 +153,23 @@ text_data = 'Soundness is about ensuring your program can’t get into certain i
 # Main                                                                         #
 ################################################################################
 
-def main(filepath, plot=False):
+def main(train_filepath, sample_filepath, plot=False):
     np.set_printoptions(precision=6)
     np.random.seed(42)
     
     # 1. Load data
-    if filepath is not None:
-        with open(filepath, mode='r', encoding='utf-8') as f:
+    if train_filepath is not None:
+        with open(train_filepath, mode='r', encoding='utf-8') as f:
             text = f.read()
     else:
         text = text_data
 
+    if sample_filepath is not None:
+        with open(sample_filepath, mode='r', encoding='utf-8') as f:
+            sample_words = f.readlines()
+
     tokens = tokenize(text)
+    print(tokens)
     word_to_id, id_to_word = mapping(tokens)
     print(id_to_word)
     
@@ -208,22 +213,24 @@ def main(filepath, plot=False):
 
     # 5. Predict with the new input data
     print(f'===== Predict')
-    for row in range(len(sample_data)):
-        input_word = sample_data[row]
+    for row in range(len(sample_words)):
+        input_word = sample_words[row].strip()
         measured = np.array(one_hot_encode(word_to_id[input_word], len(word_to_id)))
         target = mlp.predict(measured.reshape(-1, 1))
         print(f'{input_word} => {id_to_word[target]}')
 
 if __name__ == '__main__':
     try:
-        filepath = None
-        if len(sys.argv) >= 3 and 'f' in sys.argv[1]:
-            filepath = sys.argv[2]
+        train_filepath = None
+        sample_filepath = None
+        if len(sys.argv) >= 4 and 'f' in sys.argv[1]:
+            train_filepath = sys.argv[2]
+            sample_filepath = sys.argv[3]
 
         plot = False
         if len(sys.argv) >= 2 and 'p' in sys.argv[1]:
             plot = True
 
-        main(filepath, plot)
+        main(train_filepath, sample_filepath, plot)
     except:
         traceback.print_exc(file=sys.stdout)
