@@ -7,14 +7,44 @@ import numpy as np
 import re
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
+from konlpy.tag import Hannanum, Kkma, Komoran, Mecab, Okt
+import re
 
 ################################################################################
 # Functions                                                                    #
 ################################################################################
 
-def tokenize(text):
-    pattern = re.compile(r'[A-Za-z]+[\w^\']*|[\w^\']*[A-Za-z]+[\w^\']*')
-    return pattern.findall(text.lower())
+def tokenize(tokenizer_name, text):
+    if tokenizer_name == 'Hannanum':
+        tokenizer = Hannanum()
+    elif tokenizer_name == 'Kkma':
+        tokenizer = Kkma()
+    elif tokenizer_name == 'Komoran':
+        tokenizer = Komoran()
+    elif tokenizer_name == 'Mecab':
+        tokenizer = Mecab()
+    elif tokenizer_name == 'Okt':
+        tokenizer = Okt()
+    else:
+        tokenizer = Kkma()
+
+    words = re.split('\s+', text)
+
+    tokens = []
+
+    for word in words:
+        if word == '':
+            continue
+        
+        nouns = tokenizer.nouns(word.lower())
+
+        if len(nouns) == 0:
+            print(f'<{tokenizer_name}> {word} --> {nouns} !!! Failed. Use {word} anyway !!!')
+            nouns.append(word)
+        
+        tokens = tokens + nouns
+    
+    return tokens
 
 def mapping(tokens):
     word_to_id = {}
@@ -127,9 +157,10 @@ class MLP:
 
     def predict(self, measured):
         y, h = self.forward(measured)
-        p = softmax(y)
+        p = np.reshape(softmax(y), -1)
 
-        return np.argmax(p)
+        #return np.argmax(p)
+        return np.argsort(p)[::-1][:3]
 
 ################################################################################
 # Variables                                                                    #
@@ -137,55 +168,59 @@ class MLP:
 
 epochs = 50
 
-sample_words = ['static', 'string']
-
-# Excerpt from https://dart.dev/guides/language/type-system
-text_data = 'Soundness is about ensuring your program can’t get into certain invalid states. \
-    A sound type system means you can never get into a state where an expression evaluates \
-    to a value that doesn’t match the expression’s static type. For example, if an expression’s \
-    static type is String, at runtime you are guaranteed to only get a string when you evaluate it. \
-    Dart’s type system, like the type systems in Java and C#, is sound. It enforces that soundness \
-    using a combination of static checking (compile-time errors) and runtime checks. For example, \
-    assigning a String to int is a compile-time error. Casting an object to a String using as \
-    String fails with a runtime error if the object isn’t a String.'
-
 ################################################################################
 # Main                                                                         #
 ################################################################################
 
-def main(train_filepath, sample_filepath, plot=False):
+def main():
+    if len(sys.argv) < 2:
+        print(f'Usage: python {sys.argv[0]} <input_filepath> <predict_filepath> [plot]')
+        return
+
+    input_filepath = None
+    predict_filepath = None
+    if len(sys.argv) >= 3:
+        input_filepath = sys.argv[1]
+        predict_filepath = sys.argv[2]
+
+    plot = False
+    if len(sys.argv) >= 4 and sys.argv[3] == 'plot':
+        plot = True
+
+    # Available names: Hannanum, Kkma, Komoran, Mecab, Okt
+    #     * Mecab does not work at the moment due to installation problem
+    tokenizer_name = 'Kkma'
+
     np.set_printoptions(precision=6)
     np.random.seed(42)
     
     # 1. Load data
-    if train_filepath is not None:
-        with open(train_filepath, mode='r', encoding='utf-8') as f:
-            text = f.read()
-    else:
-        text = text_data
+    with open(input_filepath, mode='r', encoding='utf-8') as f:
+        text = f.read()
 
-    if sample_filepath is not None:
-        with open(sample_filepath, mode='r', encoding='utf-8') as f:
+    if predict_filepath is not None:
+        with open(predict_filepath, mode='r', encoding='utf-8') as f:
             sample_words = f.readlines()
 
-    tokens = tokenize(text)
-    print(tokens)
+    # 2. Tokenize
+    tokens = tokenize(tokenizer_name, text)
     word_to_id, id_to_word = mapping(tokens)
-    print(id_to_word)
     
-    window = 2
+    window = 4
     X, y = generate_training_data(tokens, word_to_id, window)
 
-    # 2. Split into train and test datasets
+    # 3. Split into train and test datasets
     #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     X_train, y_train, X_test, y_test = X, y, X, y
 
     print(f'X_train.shape: {X_train.shape}')
     print(f'y_train.shape: {y_train.shape}')
-    print(f'X_train[0]: {X_train[0]}')
-    print(f'np.argmax(X_train[0]): {np.argmax(X_train[0])} ({id_to_word[np.argmax(X_train[0])]})')
+    #print(f'X_train[0]: {X_train[0]}')
+    #print(f'np.argmax(X_train[0]): {np.argmax(X_train[0])} ({id_to_word[np.argmax(X_train[0])]})')
+    #for i in range(X.shape[0]):
+    #    print(f'[{i:4d}] {id_to_word[np.argmax(X[i,])]} {id_to_word[np.argmax(y[i,])]}')
     
-    # 3. Fit with the train dataset
+    # 4. Fit with the train dataset
     input_size = len(word_to_id)
     hidden_size = 10
     output_size = len(word_to_id)
@@ -206,31 +241,24 @@ def main(train_filepath, sample_filepath, plot=False):
         plt.plot(range(len(history)), history, color="skyblue")
         plt.show()
 
-    # 4. Evaluate with the test dataset
+    # 5. Evaluate with the test dataset
     print('==== Test ====')
     loss, acc = mlp.train(X_test, y_test, False)
     print(f'loss: {loss:.4f}, accuracy: {acc:.4f}')
 
-    # 5. Predict with the new input data
+    # 6. Predict with the new input data
     print(f'===== Predict')
     for row in range(len(sample_words)):
         input_word = sample_words[row].strip()
         measured = np.array(one_hot_encode(word_to_id[input_word], len(word_to_id)))
         target = mlp.predict(measured.reshape(-1, 1))
-        print(f'{input_word} => {id_to_word[target]}')
+        print(f'**{input_word}** =>', end='')
+        for idx in target:
+            print(f' **{id_to_word[idx]}**', end='')
+        print()
 
 if __name__ == '__main__':
     try:
-        train_filepath = None
-        sample_filepath = None
-        if len(sys.argv) >= 4 and 'f' in sys.argv[1]:
-            train_filepath = sys.argv[2]
-            sample_filepath = sys.argv[3]
-
-        plot = False
-        if len(sys.argv) >= 2 and 'p' in sys.argv[1]:
-            plot = True
-
-        main(train_filepath, sample_filepath, plot)
+        main()
     except:
         traceback.print_exc(file=sys.stdout)
