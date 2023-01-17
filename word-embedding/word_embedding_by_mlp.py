@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from konlpy.tag import Hannanum, Kkma, Komoran, Mecab, Okt
 import re
 from sklearn.manifold import TSNE
-import matplotlib
 import matplotlib.pyplot as plt
 
 ################################################################################
@@ -218,7 +217,8 @@ def main():
     if len(sys.argv) >= 4 and sys.argv[3] == 'plot':
         plot = True
 
-    matplotlib.rc('font', family='NanumGothic')
+    plt.rcParams['font.family'] = 'NanumGothic'
+    plt.rcParams['axes.unicode_minus'] = False
 
     # Available names: Hannanum, Kkma, Komoran, Mecab, Okt
     #     * Mecab does not work at the moment due to installation problem
