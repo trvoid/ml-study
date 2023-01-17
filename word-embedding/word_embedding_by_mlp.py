@@ -9,6 +9,9 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from konlpy.tag import Hannanum, Kkma, Komoran, Mecab, Okt
 import re
+from sklearn.manifold import TSNE
+import matplotlib
+import matplotlib.pyplot as plt
 
 ################################################################################
 # Functions                                                                    #
@@ -88,6 +91,34 @@ def generate_training_data(tokens, word_to_id, window):
     
     return np.asarray(X), np.asarray(y)
 
+def tsne_plot(id_to_word, embeddings):
+    labels = []
+    tokens = []
+
+    for id in range(len(id_to_word)):
+        tokens.append(embeddings[:,id])
+        labels.append(id_to_word[id])
+
+    tsne_model = TSNE(perplexity=40, n_components=2, init='pca', n_iter=2500, random_state=23)
+    new_values = tsne_model.fit_transform(tokens)
+
+    x = []
+    y = []
+    for value in new_values:
+        x.append(value[0])
+        y.append(value[1])
+        
+    plt.figure(figsize=(16, 16)) 
+    for i in range(len(x)):
+        plt.scatter(x[i],y[i])
+        plt.annotate(labels[i],
+                     xy=(x[i], y[i]),
+                     xytext=(5, 2),
+                     textcoords='offset points',
+                     ha='right',
+                     va='bottom')
+    plt.show()
+    
 ################################################################################
 # Classes                                                                      #
 ################################################################################
@@ -187,6 +218,8 @@ def main():
     if len(sys.argv) >= 4 and sys.argv[3] == 'plot':
         plot = True
 
+    matplotlib.rc('font', family='NanumGothic')
+
     # Available names: Hannanum, Kkma, Komoran, Mecab, Okt
     #     * Mecab does not work at the moment due to installation problem
     tokenizer_name = 'Kkma'
@@ -206,7 +239,7 @@ def main():
     tokens = tokenize(tokenizer_name, text)
     word_to_id, id_to_word = mapping(tokens)
     
-    window = 4
+    window = 2
     X, y = generate_training_data(tokens, word_to_id, window)
 
     # 3. Split into train and test datasets
@@ -250,12 +283,16 @@ def main():
     print(f'===== Predict')
     for row in range(len(sample_words)):
         input_word = sample_words[row].strip()
+        if len(input_word) == 0:
+            continue
         measured = np.array(one_hot_encode(word_to_id[input_word], len(word_to_id)))
         target = mlp.predict(measured.reshape(-1, 1))
         print(f'**{input_word}** =>', end='')
         for idx in target:
             print(f' **{id_to_word[idx]}**', end='')
         print()
+
+    tsne_plot(id_to_word, mlp.Wxh)
 
 if __name__ == '__main__':
     try:
