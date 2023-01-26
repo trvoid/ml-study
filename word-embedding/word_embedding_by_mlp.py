@@ -285,12 +285,13 @@ def main():
         input_word = sample_words[row].strip()
         if len(input_word) == 0:
             continue
-        measured = np.array(one_hot_encode(word_to_id[input_word], len(word_to_id)))
-        target = mlp.predict(measured.reshape(-1, 1))
-        print(f'**{input_word}** =>', end='')
-        for idx in target:
-            print(f' **{id_to_word[idx]}**', end='')
-        print()
+        if input_word in word_to_id:
+            measured = np.array(one_hot_encode(word_to_id[input_word], len(word_to_id)))
+            target = mlp.predict(measured.reshape(-1, 1))
+            print(f'**{input_word}** =>', end='')
+            for idx in target:
+                print(f' **{id_to_word[idx]}**', end='')
+            print()
 
     tsne_plot(id_to_word, mlp.Wxh)
 
