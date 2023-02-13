@@ -97,9 +97,9 @@ def tsne_plot(id_to_word, embeddings):
     for id in range(len(id_to_word)):
         tokens.append(embeddings[:,id])
         labels.append(id_to_word[id])
-
+    
     tsne_model = TSNE(perplexity=40, n_components=2, init='pca', n_iter=2500, random_state=23)
-    new_values = tsne_model.fit_transform(tokens)
+    new_values = tsne_model.fit_transform(np.array(tokens))
 
     x = []
     y = []
