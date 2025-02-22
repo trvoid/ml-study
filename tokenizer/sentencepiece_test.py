@@ -4,6 +4,7 @@
 
 import os, sys, traceback, argparse
 import psutil, time
+import glob
 import sentencepiece as spm
 import pandas as pd
 import csv
@@ -31,26 +32,6 @@ def print_output_filepath(filepath, message=''):
 # Variables
 ################################################################################
 
-files_all = [
-    'data/won01-buljoyogyeong.txt',
-    'data/won02-daesanjongsabeobeo.txt',
-    'data/won03-jeongsanjongsabeobeo.txt',
-    'data/won04-gyojeon.txt',
-    'data/won05-gyosa.txt',
-    'data/won06-yejeon.txt',
-    'data/wiki01-won.txt',
-    'data/wiki02-park.txt',
-    'data/wiki03-wonkwang-univ.txt',
-    'data/namu01-won.txt',
-    'data/news01-ohmy.txt',
-    'data/dic01-won.txt',
-    'data/wonnews01-pyouh.txt'
-]
-
-files_one = [
-    'data/won04-gyojeon.txt'
-]
-
 max_sentence_length = 9999
 
 ################################################################################
@@ -58,18 +39,29 @@ max_sentence_length = 9999
 ################################################################################
 
 def main(args):
+    dir = args.dir
     alg = args.alg
-    files = args.files
+    # How to decise: 8352, 24707?
+    vocab_size = args.vocab_size if args.vocab_size is not None else 24707
+    
+    if not os.path.isdir(dir):
+        raise Exception('Not a directory: ' + dir)
+    
+    dir = os.path.abspath(dir)
+    basename = os.path.basename(dir)
+    
+    # 훈련용 텍스트 파일 목록 만들기
+    files = glob.glob(os.path.join(dir, '*.txt'))
+    data_file = ','.join(files)
 
-    data_file = ','.join(files_all) if files == 'all' else ','.join(files_one)
-
-    output_dir = f'./output/sentencepiece/{alg}_{files}'
+    # 결과 디렉토리 만들기
+    output_dir = f'./output/sentencepiece/{basename}_{alg}'
     os.makedirs(output_dir, exist_ok=True)
 
+    # 모델 이름 지정
     model_prefix = os.path.join(output_dir, 'tokenizer')
-
-    vocab_size = 8352 if alg == 'unigram' and files == 'all' else 24707 
-
+    
+    # 토크나이저 훈련
     start_time = time.time()
 
     spm.SentencePieceTrainer.Train(f'--input={data_file} --model_prefix={model_prefix} --vocab_size={vocab_size} --model_type={alg} --max_sentence_length={max_sentence_length} --minloglevel=1')
@@ -82,6 +74,7 @@ def main(args):
     print(f'훈련 결과 단어 목록 크기: {len(vocab_list)}')
     print(vocab_list.sample(10))
 
+    # 토크나이저 사용
     sp = spm.SentencePieceProcessor()
     vocab_file = f"{model_prefix}.model"
     sp.load(vocab_file)
@@ -92,7 +85,7 @@ def main(args):
         "원불교는 대종사께서 창시하셨고 일원상 진리를 가르치신다."
     ]
     for line in lines:
-        print('---------------------------------------')
+        print('================================================================')
         print(line)
         print()
         print(sp.encode_as_pieces(line))
@@ -109,6 +102,12 @@ if __name__ == '__main__':
             description="SentencePiece Test"
         )
         parser.add_argument(
+            "--dir",
+            type=str,
+            required=True,
+            help="Specifies a directory that has text files for training.",
+        )
+        parser.add_argument(
             "--alg",
             type=str,
             choices=['bpe', 'unigram'],
@@ -116,11 +115,10 @@ if __name__ == '__main__':
             help="Specifies the algorithm.",
         )
         parser.add_argument(
-            "--files",
-            type=str,
-            choices=['all', 'one'],
-            required=True,
-            help="Specifies the option on the selection of training files.",
+            "--vocab_size",
+            type=int,
+            required=False,
+            help="Specifies the size of vocabulary.",
         )
         args = parser.parse_args()
 

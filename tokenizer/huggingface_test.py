@@ -4,6 +4,7 @@
 
 import os, sys, traceback, argparse
 import psutil, time
+import glob
 from tokenizers import BertWordPieceTokenizer, SentencePieceBPETokenizer
 
 ################################################################################
@@ -29,26 +30,6 @@ def print_output_filepath(filepath, message=''):
 # Variables
 ################################################################################
 
-files_all = [
-    'data/won01-buljoyogyeong.txt',
-    'data/won02-daesanjongsabeobeo.txt',
-    'data/won03-jeongsanjongsabeobeo.txt',
-    'data/won04-gyojeon.txt',
-    'data/won05-gyosa.txt',
-    'data/won06-yejeon.txt',
-    'data/wiki01-won.txt',
-    'data/wiki02-park.txt',
-    'data/wiki03-wonkwang-univ.txt',
-    'data/namu01-won.txt',
-    'data/news01-ohmy.txt',
-    'data/dic01-won.txt',
-    'data/wonnews01-pyouh.txt'
-]
-
-files_one = [
-    'data/won04-gyojeon.txt'
-]
-
 vocab_size = 30000
 limit_alphabet = 6000
 min_frequency = 5
@@ -58,17 +39,26 @@ min_frequency = 5
 ################################################################################
 
 def main(args):
+    dir = args.dir
     tok = args.tok
-    files = args.files
+    
+    if not os.path.isdir(dir):
+        raise Exception('Not a directory: ' + dir)
+    
+    dir = os.path.abspath(dir)
+    basename = os.path.basename(dir)
+    
+    # 훈련용 텍스트 파일 목록 만들기
+    data_file = glob.glob(os.path.join(dir, '*.txt'))
 
-    data_file = files_all if files == 'all' else files_one
-    print(data_file)
-
-    output_dir = './output/huggingface/{tok}_{files}'
+    # 결과 디렉토리 만들기
+    output_dir = f'./output/huggingface/{basename}_{tok}'
     os.makedirs(output_dir, exist_ok=True)
 
+    # 토크나이저 생성
     tokenizer = BertWordPieceTokenizer(lowercase=False, strip_accents=False) if tok == 'bpe' else SentencePieceBPETokenizer() 
-
+    
+    # 토크나이저 훈련
     start_time = time.time()
 
     tokenizer.train(files=data_file,
@@ -82,6 +72,7 @@ def main(args):
     print_memory_usage('processing done')
     print_output_filepath(output_dir)
 
+    # 토크나이저 사용
     lines = [
       "개교표어",
       "19.대종사 말씀하시기를 [스승이 법을 새로 내는 일이나, 제자들이 그 법을 받아서 후래 대중에게 전하는 일이나, 또 후래 대중이 그 법을 반가이 받들어 실행하는 일이 삼위 일체(三位一體)되는 일이라, 그 공덕도 또한 다름이 없나니라.]",
@@ -89,8 +80,7 @@ def main(args):
     ]
     for line in lines:
       tokenized = tokenizer.encode(line)
-
-      print('--- SentencePieceTokenizer ------------------------------------')
+      print('================================================================')
       print(line)
       print()
       print(tokenized)
@@ -104,18 +94,17 @@ if __name__ == '__main__':
             description="Hugging Face Tokenizers Test"
         )
         parser.add_argument(
+            "--dir",
+            type=str,
+            required=True,
+            help="Specifies a directory that has text files for training.",
+        )
+        parser.add_argument(
             "--tok",
             type=str,
             choices=['bert', 'sp'],
             required=True,
             help="Specifies the tokenizer, BertWordPieceTokenizer or SentencePieceBPETokenizer",
-        )
-        parser.add_argument(
-            "--files",
-            type=str,
-            choices=['all', 'one'],
-            required=True,
-            help="Specifies the option on the selection of training files.",
         )
         args = parser.parse_args()
 
