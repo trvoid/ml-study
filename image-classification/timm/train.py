@@ -109,7 +109,7 @@ def main():
 
     # Model
     logging.info(f'==> Building model: {args.model}..')
-    net = get_model(args.model, pretrained=args.pretrained, num_classes=10)
+    net = get_model(args.model, pretrained=args.pretrained, num_classes=10, img_size=img_size)
     net = net.to(device)
 
     criterion = nn.CrossEntropyLoss()
