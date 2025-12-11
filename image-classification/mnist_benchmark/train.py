@@ -1,0 +1,175 @@
+import argparse
+import os
+import logging
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+from models import get_model
+
+def get_args():
+    parser = argparse.ArgumentParser(description='Train MNIST models')
+    parser.add_argument('--model', type=str, required=True, 
+                        choices=['simplecnn', 'mlp', 'resnet18'],
+                        help='Model architecture')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs')
+    parser.add_argument('--batch-size', type=int, default=64, help='Batch size')
+    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
+    parser.add_argument('--data-dir', type=str, default='./data', help='Data directory')
+    parser.add_argument('--weights-path', type=str, default='./checkpoints', help='Path to save weights')
+    parser.add_argument('--log-file', type=str, default='train.log', help='Path to save logs')
+    parser.add_argument('--no-cuda', action='store_true', help='Disable CUDA')
+    return parser.parse_args()
+
+def setup_logging(log_file):
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()
+        ]
+    )
+
+def plot_history(train_losses, test_losses, train_accs, test_accs, save_path):
+    plt.figure(figsize=(12, 5))
+    
+    plt.subplot(1, 2, 1)
+    plt.plot(train_losses, label='Train Loss')
+    plt.plot(test_losses, label='Test Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title('Loss History')
+    
+    plt.subplot(1, 2, 2)
+    plt.plot(train_accs, label='Train Acc')
+    plt.plot(test_accs, label='Test Acc')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.legend()
+    plt.title('Accuracy History')
+    
+    plt.savefig(save_path)
+    plt.close()
+
+def main():
+    args = get_args()
+    setup_logging(args.log_file)
+    
+    device = torch.device('cuda' if torch.cuda.is_available() and not args.no_cuda else 'cpu')
+    logging.info(f"Using device: {device}")
+
+    # Hyperparameters & Settings
+    best_acc = 0
+    start_epoch = 0
+    
+    if not os.path.exists(args.weights_path):
+        os.makedirs(args.weights_path)
+
+    # Data Preparation
+    logging.info('==> Preparing data..')
+    
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+
+    trainset = torchvision.datasets.MNIST(root=args.data_dir, train=True, download=True, transform=transform)
+    trainloader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=2)
+
+    testset = torchvision.datasets.MNIST(root=args.data_dir, train=False, download=True, transform=transform)
+    testloader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=2)
+
+    # Model
+    logging.info(f'==> Building model: {args.model}..')
+    net = get_model(args.model, num_classes=10)
+    net = net.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+
+    # History tracking
+    train_losses = []
+    test_losses = []
+    train_accs = []
+    test_accs = []
+
+    def train(epoch):
+        net.train()
+        train_loss = 0
+        correct = 0
+        total = 0
+        with tqdm(total=len(trainloader), desc=f'Epoch {epoch+1}/{args.epochs}', unit='batch') as pbar:
+            for batch_idx, (inputs, targets) in enumerate(trainloader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                optimizer.zero_grad()
+                outputs = net(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
+
+                train_loss += loss.item()
+                _, predicted = outputs.max(1)
+                total += targets.size(0)
+                correct += predicted.eq(targets).sum().item()
+                
+                pbar.set_postfix({'Loss': train_loss/(batch_idx+1), 'Acc': 100.*correct/total})
+                pbar.update(1)
+        
+        epoch_loss = train_loss/len(trainloader)
+        epoch_acc = 100.*correct/total
+        train_losses.append(epoch_loss)
+        train_accs.append(epoch_acc)
+        logging.info(f'Epoch {epoch+1} Train: Loss: {epoch_loss:.4f}, Acc: {epoch_acc:.2f}%')
+
+    def test(epoch):
+        nonlocal best_acc
+        net.eval()
+        test_loss = 0
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for batch_idx, (inputs, targets) in enumerate(testloader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = net(inputs)
+                loss = criterion(outputs, targets)
+
+                test_loss += loss.item()
+                _, predicted = outputs.max(1)
+                total += targets.size(0)
+                correct += predicted.eq(targets).sum().item()
+
+        epoch_loss = test_loss/len(testloader)
+        epoch_acc = 100.*correct/total
+        test_losses.append(epoch_loss)
+        test_accs.append(epoch_acc)
+        logging.info(f'Epoch {epoch+1} Test: Loss: {epoch_loss:.4f}, Acc: {epoch_acc:.2f}%')
+
+        if epoch_acc > best_acc:
+            logging.info(f'Saving.. (New best: {epoch_acc:.2f}%)')
+            state = {
+                'net': net.state_dict(),
+                'acc': epoch_acc,
+                'epoch': epoch,
+            }
+            torch.save(state, os.path.join(args.weights_path, f'{args.model}_best.pth'))
+            best_acc = epoch_acc
+
+    for epoch in range(start_epoch, args.epochs):
+        train(epoch)
+        test(epoch)
+        scheduler.step()
+        
+    # Plot history
+    plot_path = os.path.join(args.weights_path, f'{args.model}_history.png')
+    plot_history(train_losses, test_losses, train_accs, test_accs, plot_path)
+    logging.info(f'Training history saved to {plot_path}')
+
+if __name__ == '__main__':
+    main()
