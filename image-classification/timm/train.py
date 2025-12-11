@@ -17,6 +17,10 @@ def get_args():
     parser.add_argument('--model', type=str, required=True, 
                         choices=['efficientnet', 'mobilenet', 'wideresnet', 'vit'],
                         help='Model architecture')
+    parser.add_argument('--mode', type=str, default='NATIVE', choices=['NATIVE', 'RESIZE'],
+                        help='Mode: NATIVE (32x32) or RESIZE (224x224)')
+    parser.add_argument('--stride', type=int, default=1, choices=[1, 2],
+                        help='Stride for small images (CIFAR-10 32x32)')
     parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
     parser.add_argument('--batch-size', type=int, default=128, help='Batch size')
     parser.add_argument('--lr', type=float, default=0.1, help='Learning rate')
@@ -60,12 +64,11 @@ def plot_history(train_losses, test_losses, train_accs, test_accs, save_path):
     plt.savefig(save_path)
     plt.close()
 
-def get_transforms(mode):
+def get_transforms(img_size):
     stats = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)) # CIFAR-10 Mean/Std
     
-    if mode == 'RESIZE':
+    if img_size == 224:
         # ImageNet 규격에 맞춤 (224x224)
-        img_size = 224
         logging.info(f"Resizing images to {img_size}x{img_size}")
         transform_train = transforms.Compose([
             transforms.Resize(img_size),
@@ -80,7 +83,6 @@ def get_transforms(mode):
         ])
     else: # NATIVE
         # 32x32 원본 사용
-        img_size = 32
         logging.info(f"Using original images of size {img_size}x{img_size}")
         transform_train = transforms.Compose([
             transforms.Resize(img_size),
@@ -117,8 +119,18 @@ def main():
     # Data Preparation
     logging.info('==> Preparing data..')
     
-    transform_train, transform_test = get_transforms("RESIZE" if args.model == 'vit' else "NATIVE")
-    
+    # Determine mode: if model is ViT, force RESIZE, otherwise use args.mode
+    if args.model == 'vit':
+        mode = 'RESIZE'
+        logging.info("Model is ViT, forcing RESIZE mode")
+    else:
+        mode = args.mode
+
+    # Determine img_size for model creation
+    img_size = 224 if mode == 'RESIZE' else 32
+
+    transform_train, transform_test = get_transforms(img_size)
+        
     trainset = torchvision.datasets.CIFAR10(root=args.data_dir, train=True, download=True, transform=transform_train)
     trainloader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
@@ -127,7 +139,7 @@ def main():
 
     # Model
     logging.info(f'==> Building model: {args.model}..')
-    net = get_model(args.model, pretrained=args.pretrained, num_classes=10, img_size=img_size)
+    net = get_model(args.model, pretrained=args.pretrained, num_classes=10, img_size=img_size, stride=args.stride)
     net = net.to(device)
 
     criterion = nn.CrossEntropyLoss()

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import timm
 
-def get_model(model_name, pretrained=True, num_classes=10, img_size=224):
+def get_model(model_name, pretrained=True, num_classes=10, img_size=224, stride=1):
     """
     Create a model using timm library.
     
@@ -11,6 +11,7 @@ def get_model(model_name, pretrained=True, num_classes=10, img_size=224):
         pretrained (bool): Whether to load pretrained weights
         num_classes (int): Number of output classes
         img_size (int): Input image size
+        stride (int): Stride for small images (CIFAR-10 32x32)
         
     Returns:
         nn.Module: The requested model
@@ -33,7 +34,7 @@ def get_model(model_name, pretrained=True, num_classes=10, img_size=224):
     model = timm.create_model(timm_name, pretrained=pretrained, num_classes=num_classes)
     
     # Adjust stride for small images (CIFAR-10 32x32)
-    if img_size <= 32:
+    if img_size <= 32 and stride == 1:
         print(f"Adjusting stride for small image size: {img_size}")
         if hasattr(model, 'conv_stem'):
             # EfficientNet, MobileNet
