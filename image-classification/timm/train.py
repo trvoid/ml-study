@@ -60,6 +60,43 @@ def plot_history(train_losses, test_losses, train_accs, test_accs, save_path):
     plt.savefig(save_path)
     plt.close()
 
+def get_transforms(mode):
+    stats = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)) # CIFAR-10 Mean/Std
+    
+    if mode == 'RESIZE':
+        # ImageNet 규격에 맞춤 (224x224)
+        img_size = 224
+        logging.info(f"Resizing images to {img_size}x{img_size}")
+        transform_train = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(*stats),
+        ])
+        transform_test = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.ToTensor(),
+            transforms.Normalize(*stats),
+        ])
+    else: # NATIVE
+        # 32x32 원본 사용
+        img_size = 32
+        logging.info(f"Using original images of size {img_size}x{img_size}")
+        transform_train = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.RandomCrop(img_size, padding=4), 
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(*stats),
+        ])
+        transform_test = transforms.Compose([
+            transforms.Resize(img_size),
+            transforms.RandomCrop(img_size, padding=4), 
+            transforms.ToTensor(),
+            transforms.Normalize(*stats),
+        ])
+    return transform_train, transform_test
+
 def main():
     args = get_args()
     if not os.path.exists(os.path.dirname(args.log_file)) and os.path.dirname(args.log_file) != '':
@@ -80,27 +117,8 @@ def main():
     # Data Preparation
     logging.info('==> Preparing data..')
     
-    # Image size determination
-    if args.model == 'vit':
-        img_size = 224
-        logging.info(f"Model is ViT, resizing images to {img_size}x{img_size}")
-    else:
-        img_size = 32
-        
-    transform_train = transforms.Compose([
-        transforms.Resize(img_size),
-        transforms.RandomCrop(img_size, padding=4 if img_size==32 else 0), 
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
-    transform_test = transforms.Compose([
-        transforms.Resize(img_size),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
+    transform_train, transform_test = get_transforms("RESIZE" if args.model == 'vit' else "NATIVE")
+    
     trainset = torchvision.datasets.CIFAR10(root=args.data_dir, train=True, download=True, transform=transform_train)
     trainloader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
